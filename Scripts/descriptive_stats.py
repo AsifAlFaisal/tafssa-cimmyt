@@ -1,6 +1,7 @@
 #%%
 import pandas as pd
 import plotly.express as px
+from copy import deepcopy
 # %%
 file_name = "C:/Users/A.FAISAL/OneDrive - CIMMYT/ASIF BACKUP/TAFSSA/Anton Data Requirements/Final DB/221220_south_asia_merged_Ag_diversity_TAFSSA.csv"
 df = pd.read_csv(file_name, encoding="ISO-8859-1")
@@ -9,13 +10,16 @@ df['uid'] = df['uid'].apply(lambda x: x.upper())
 df['GID_2'] = df['GID_2'].apply(lambda x: x.upper())
 df['production'] = df['production'].apply(lambda x: float(x.replace('\n','')))
 df['area'] = df['area'].apply(lambda x: float(x.replace('\n','')))
-df = df[df['production'] !=0]
+df = df.query("production!=0 & area!=0 & crop_category2!='Unknown'")
+
+#df = df[df['production'] !=0]
+#df = df[df['area'] !=0]
 # %% Check Unique Years
 print(df.groupby(by=['country']).agg({'year':'unique'}).reset_index())
 # %%
-data1 = pd.read_csv("221221_ag_diversity_crop_category_summary.csv",encoding="ISO-8859-1")
+data1 = pd.read_csv("../output/221221_ag_diversity_crop_category_summary.csv",encoding="ISO-8859-1")
 
-data2 = pd.read_csv("221221_ag_diversity_crop_summary.csv",encoding="ISO-8859-1")
+data2 = pd.read_csv("../output/221221_ag_diversity_crop_summary.csv",encoding="ISO-8859-1")
 
 data3 = df.groupby(["country","division/state","district","year"]).agg({"crop":"count","GID_2":"first","area":"sum","production":"sum"}).reset_index()
 
@@ -129,4 +133,21 @@ for country in data5['country'].unique():
         fig.write_image(f"../output/{fname}")
         #fig.show()
 
+# %% Vegetable Proportion
+data6 = pd.read_excel('../output/221222_Ag_Diversity_Latest_Summary.xlsx', sheet_name='Crop Count')
+data6 = data6.query("production!=0 & area!=0 & major_crop_category!='Unknown'")
+veg_cat = ['Other Vegetables', 'Other Vitamin A-Rich Fruits And Vegetables', 'Dark Green Leafy Vegetables ']
+non_veg_cat = [c for c in data6.major_crop_category.unique() if c not in veg_cat]
+data6.loc[data6.major_crop_category.isin(veg_cat),'temp_cat'] = 'Vegetable'
+data6.loc[data6.major_crop_category.isin(non_veg_cat),'temp_cat'] = 'Non-Vegetable'
+data6 = data6.groupby(['country','district','year','temp_cat']).agg({'division/state':'first',
+                                                                    'GID_2':'first',
+                                                                    'area':'sum',
+                                                                    'production':'sum'}).reset_index()
+
+data6['fraction'] = data6.area / data6.groupby(['country','district'])['area'].transform('sum')
+# %%
+data6.head()
+# %%
+data6.to_csv('../output/230105_Veg_and_NonVeg_fraction.csv', index=False)
 # %%
